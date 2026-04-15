@@ -8,6 +8,15 @@
   <p class="subtitle">Two players. One winner. Endless rematches.</p>
   <button class="reset-btn" (click)="newGame()">Start New Game</button>
 </header>
+<div class="mode-toggle">
+  <button (click)="setMode('single')" [class.active]="mode === 'single'">
+    Single Player
+  </button>
+
+  <button (click)="setMode('two')" [class.active]="mode === 'two'">
+    2 Player
+  </button>
+</div>
 
   <section class="status-wrap">
     <p class="status" *ngIf="!winner && !draw">

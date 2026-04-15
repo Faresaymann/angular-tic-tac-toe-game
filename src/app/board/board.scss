@@ -287,3 +287,48 @@
   transform: translateY(-2px);
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
 }
+
+// Mode toggle styles (Ai vs Player / Player vs Player)
+.mode-toggle {
+  position: relative;
+  display: flex;
+  width: 220px;
+  background: #1e293b; // dark background
+  border-radius: 999px;
+  padding: 4px;
+  margin: 20px auto;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+
+  button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    font-weight: 600;
+    padding: 10px 0;
+    cursor: pointer;
+    z-index: 2;
+    transition: color 0.3s ease;
+
+    &.active {
+      color: #0f172a;
+    }
+  }
+
+  .slider {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: calc(50% - 4px);
+    height: calc(100% - 8px);
+    background: linear-gradient(135deg, #38bdf8, #6366f1);
+    border-radius: 999px;
+    transition: transform 0.3s ease;
+    z-index: 1;
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
+  }
+
+  .slider.right {
+    transform: translateX(100%);
+  }
+}
