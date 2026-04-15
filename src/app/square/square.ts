@@ -1,9 +1,15 @@
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
+
+type Cell = 'X' | 'O' | null;
 
 @Component({
   selector: 'app-square',
-  imports: [],
+  standalone: true,
   templateUrl: './square.html',
-  styleUrl: './square.scss',
+  styleUrl: './square.scss'
 })
-export class Square {}
+export class Square {
+  @Input() value: Cell = null;
+  @Input() isWinning = false;
+  @Output() clicked = new EventEmitter<void>();
+}

@@ -1,0 +1,53 @@
+<div class="game-shell">
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+ <header class="hero">
+  <h1 class="title">Tic Tac Toe</h1>
+  <p class="subtitle">Two players. One winner. Endless rematches.</p>
+  <button class="reset-btn" (click)="newGame()">Start New Game</button>
+</header>
+
+  <section class="status-wrap">
+    <p class="status" *ngIf="!winner && !draw">
+      Current Player: <span>{{ player }}</span>
+    </p>
+
+    <p class="status winner-text" *ngIf="winner">
+      Player <span>{{ winner }}</span> won the game! 🎉
+    </p>
+
+    <p class="status draw-text" *ngIf="draw">
+      It is a draw. Nobody wins this round.
+    </p>
+  </section>
+
+  <main class="board" [class.board-win]="winner" [class.board-draw]="draw">
+    <app-square
+      *ngFor="let val of squares; let i = index"
+      [value]="val"
+      [isWinning]="winningLine?.includes(i) ?? false"
+      (clicked)="makeMove(i)">
+    </app-square>
+  </main>
+
+  <div class="play-again-modal" *ngIf="showPlayAgain">
+    <div class="play-again-panel">
+      <p>Wanna play again?</p>
+      <button class="new-game-btn" (click)="newGame()">Play Again</button>
+    </div>
+  </div>
+
+  <div class="celebration" *ngIf="celebrationActive" aria-hidden="true">
+    <span
+      class="spark"
+      *ngFor="let s of sparks"
+      [style.--x.px]="s.x"
+      [style.--y.px]="s.y"
+      [style.--delay]="s.delay + 's'"
+      [style.--size.px]="s.size"
+      [style.--color]="s.color">
+    </span>
+  </div>
+</div>

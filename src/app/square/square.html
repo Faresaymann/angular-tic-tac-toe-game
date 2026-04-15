@@ -1,1 +1,11 @@
-<p>square works!</p>
+<button
+  type="button"
+  class="square-btn"
+  [class.x]="value === 'X'"
+  [class.o]="value === 'O'"
+  [class.empty]="!value"
+  [class.winning]="isWinning"
+  (click)="clicked.emit()"
+>
+  <span class="mark">{{ value }}</span>
+</button>
