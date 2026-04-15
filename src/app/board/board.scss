@@ -45,6 +45,15 @@
   font-size: 1rem;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
 .status-wrap {
   min-height: 70px;
   display: flex;
@@ -134,6 +143,7 @@
   background: linear-gradient(135deg, #f8fafc, #cbd5e1);
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.35);
   cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .new-game-btn:hover {
@@ -257,43 +267,54 @@
   }
 }
 
-@media (max-width: 520px) {
-  .board {
-    grid-template-columns: repeat(3, minmax(72px, 1fr));
-    gap: 10px;
-    padding: 12px;
-  }
-
-  .play-again-modal {
-    top: 12px;
-    width: min(94vw, 320px);
-  }
-}
 .reset-btn {
-  margin-top: 14px;
+  position: relative;
+  overflow: hidden;
+  padding: 12px 20px;
   border: 0;
-  border-radius: 999px;
-  padding: 10px 20px;
-  font-size: 0.95rem;
-  font-weight: 800;
-  color: #0f172a;
-  background: linear-gradient(135deg, #f8fafc, #cbd5e1);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  border-radius: 14px;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  color: #f8fafc;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  background: linear-gradient(135deg, #38bdf8 0%, #6366f1 55%, #8b5cf6 100%);
+  box-shadow: 0 10px 26px rgba(99, 102, 241, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.reset-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.22) 50%, transparent 100%);
+  transform: translateX(-120%);
 }
 
 .reset-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 14px 30px rgba(99, 102, 241, 0.38);
+  filter: brightness(1.05);
 }
 
-// Mode toggle styles (Ai vs Player / Player vs Player)
+.reset-btn:hover::after {
+  animation: shine 0.8s ease;
+}
+
+.reset-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+@keyframes shine {
+  100% {
+    transform: translateX(120%);
+  }
+}
+
 .mode-toggle {
   position: relative;
   display: flex;
   width: 220px;
-  background: #1e293b; // dark background
+  background: #1e293b;
   border-radius: 999px;
   padding: 4px;
   margin: 20px auto;
@@ -330,5 +351,176 @@
 
   .slider.right {
     transform: translateX(100%);
+  }
+}
+
+.sound-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  cursor: pointer;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 0 0 1px rgba(96, 165, 250, 0.08) inset,
+    0 10px 24px rgba(15, 23, 42, 0.35),
+    0 0 18px rgba(56, 189, 248, 0.18);
+  transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+
+.sound-btn:hover {
+  transform: translateY(-2px);
+}
+
+.sound-btn:not(.muted):hover {
+  border-color: rgba(96, 165, 250, 0.7);
+  box-shadow:
+    0 0 0 1px rgba(96, 165, 250, 0.12) inset,
+    0 12px 28px rgba(15, 23, 42, 0.4),
+    0 0 22px rgba(56, 189, 248, 0.45);
+}
+
+.sound-btn.muted {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(51, 20, 20, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(248, 113, 113, 0.1) inset,
+    0 10px 24px rgba(15, 23, 42, 0.35),
+    0 0 18px rgba(248, 113, 113, 0.22);
+  animation: mutedPulse 1.4s ease-in-out infinite;
+}
+
+.sound-btn:active {
+  transform: scale(0.97);
+}
+
+.sound-icon {
+  position: relative;
+  width: 26px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wave {
+  position: absolute;
+  bottom: 0;
+  width: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  transform-origin: center bottom;
+}
+
+.wave-1 {
+  left: 4px;
+  height: 7px;
+  animation: waveMove 0.9s ease-in-out infinite;
+}
+
+.wave-2 {
+  left: 11px;
+  height: 13px;
+  animation: waveMove 0.9s ease-in-out infinite 0.12s;
+}
+
+.wave-3 {
+  left: 18px;
+  height: 9px;
+  animation: waveMove 0.9s ease-in-out infinite 0.24s;
+}
+
+.sound-btn:not(.muted) .wave {
+  color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
+}
+
+.sound-btn.muted .wave {
+  color: #f87171;
+  animation-play-state: paused;
+}
+
+.sound-label {
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.2px;
+}
+
+@keyframes waveMove {
+  0%, 100% {
+    transform: scaleY(0.7);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scaleY(1.35);
+    opacity: 1;
+  }
+}
+
+@keyframes mutedPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(248, 113, 113, 0.1) inset,
+      0 10px 24px rgba(15, 23, 42, 0.35),
+      0 0 18px rgba(248, 113, 113, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(248, 113, 113, 0.18) inset,
+      0 10px 24px rgba(15, 23, 42, 0.35),
+      0 0 28px rgba(248, 113, 113, 0.42);
+  }
+}
+
+@media (max-width: 520px) {
+  .board {
+    grid-template-columns: repeat(3, minmax(72px, 1fr));
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .play-again-modal {
+    top: 12px;
+    width: min(94vw, 320px);
+  }
+
+  .header-actions {
+    gap: 10px;
+  }
+
+  .reset-btn,
+  .sound-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .sound-btn {
+    max-width: 220px;
+  }
+}
+
+
+.subtitle {
+  margin: 10px 0 0;
+  font-size: 1rem;
+  opacity: 0.85;
+  letter-spacing: 0.3px;
+  color: rgba(226, 232, 240, 0.8);
+  animation: subtitleFade 0.8s ease-out;
+}
+
+@keyframes subtitleFade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 0.85;
+    transform: translateY(0);
   }
 }

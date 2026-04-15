@@ -3,11 +3,31 @@
   <div class="bg-orb orb-2"></div>
   <div class="bg-orb orb-3"></div>
 
- <header class="hero">
+<header class="hero">
   <h1 class="title">Tic Tac Toe</h1>
   <p class="subtitle">Two players. One winner. Endless rematches.</p>
-  <button class="reset-btn" (click)="newGame()">Start New Game</button>
+
+  <div class="header-actions">
+    <button class="reset-btn" (click)="newGame()">
+      Start New Game
+    </button>
+
+    <button
+      class="sound-btn"
+      [class.muted]="isMuted"
+      (click)="toggleSound()"
+      [attr.aria-label]="isMuted ? 'Unmute sound' : 'Mute sound'">
+      <span class="sound-icon" aria-hidden="true">
+        <span class="wave wave-1"></span>
+        <span class="wave wave-2"></span>
+        <span class="wave wave-3"></span>
+      </span>
+
+      <span class="sound-label">{{ isMuted ? 'Muted' : 'Sound On' }}</span>
+    </button>
+  </div>
 </header>
+
 <div class="mode-toggle">
   <button (click)="setMode('single')" [class.active]="mode === 'single'">
     Single Player
@@ -17,6 +37,9 @@
     2 Player
   </button>
 </div>
+
+
+
 
   <section class="status-wrap">
     <p class="status" *ngIf="!winner && !draw">
