@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+
 import { Square } from './square';
 
 describe('Square', () => {
@@ -12,7 +13,7 @@ describe('Square', () => {
 
     fixture = TestBed.createComponent(Square);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await fixture.whenStable();
   });
 
   it('should create', () => {
