@@ -3,51 +3,56 @@
   <div class="bg-orb orb-2"></div>
   <div class="bg-orb orb-3"></div>
 
-<header class="hero">
-  <h1 class="title">Tic Tac Toe</h1>
-  <p class="subtitle">Two players. One winner. Endless rematches.</p>
+  <header class="hero">
+    <h1 class="title">Tic Tac Toe</h1>
+    <p class="subtitle">
+      Two players. One winner. Endless rematches.
+    </p>
 
-  <div class="header-actions">
-    <button class="reset-btn" (click)="newGame()">
-      Start New Game
+    <div class="header-actions">
+      <button class="reset-btn" (click)="newGame()">Start New Game</button>
+
+      <button
+        class="sound-btn"
+        [class.muted]="isMuted"
+        (click)="toggleSound()"
+        [attr.aria-label]="isMuted ? 'Unmute sound' : 'Mute sound'">
+        <span class="sound-icon" aria-hidden="true">
+          <span class="wave wave-1"></span>
+          <span class="wave wave-2"></span>
+          <span class="wave wave-3"></span>
+        </span>
+
+        <span class="sound-label">{{ isMuted ? 'Muted' : 'Sound On' }}</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="mode-toggle">
+    <button (click)="setMode('single')" [class.active]="mode === 'single'">
+      Play vs AI
     </button>
 
-    <button
-      class="sound-btn"
-      [class.muted]="isMuted"
-      (click)="toggleSound()"
-      [attr.aria-label]="isMuted ? 'Unmute sound' : 'Mute sound'">
-      <span class="sound-icon" aria-hidden="true">
-        <span class="wave wave-1"></span>
-        <span class="wave wave-2"></span>
-        <span class="wave wave-3"></span>
-      </span>
-
-      <span class="sound-label">{{ isMuted ? 'Muted' : 'Sound On' }}</span>
+    <button (click)="setMode('two')" [class.active]="mode === 'two'">
+      Play vs Friend
     </button>
+
+    <div class="slider" [class.right]="mode === 'two'"></div>
   </div>
-</header>
-
-<div class="mode-toggle">
-  <button (click)="setMode('single')" [class.active]="mode === 'single'">
-    Single Player
-  </button>
-
-  <button (click)="setMode('two')" [class.active]="mode === 'two'">
-    2 Player
-  </button>
-</div>
-
-
-
 
   <section class="status-wrap">
-    <p class="status" *ngIf="!winner && !draw">
-      Current Player: <span>{{ player }}</span>
+    <p class="status current-player" [class.ai-think]="aiThinking" [class.human-turn]="!aiThinking && !winner && !draw" *ngIf="!winner && !draw">
+    {{ currentPlayerText }}
     </p>
 
     <p class="status winner-text" *ngIf="winner">
-      Player <span>{{ winner }}</span> won the game! 🎉
+      <ng-container *ngIf="isAIMode && winner === 'O'; else humanWin">
+        AI won the game! 🤖🎉
+      </ng-container>
+
+      <ng-template #humanWin>
+        You won the game! 🎉
+      </ng-template>
     </p>
 
     <p class="status draw-text" *ngIf="draw">

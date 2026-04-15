@@ -1,7 +1,5 @@
-import { Component, OnDestroy, ChangeDetectorRef } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
-import { Inject, PLATFORM_ID } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef, Inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { Square } from '../square/square';
 
 type Player = 'X' | 'O';
@@ -23,7 +21,7 @@ interface Spark {
   templateUrl: './board.html',
   styleUrl: './board.scss'
 })
-export class Board implements OnDestroy {
+export class Board implements OnInit, OnDestroy {
   squares: Cell[] = Array(9).fill(null);
   player: Player = 'X';
   winner: Player | null = null;
@@ -39,12 +37,12 @@ export class Board implements OnDestroy {
     return this.mode === 'single';
   }
 
+  subtitleText = 'Two players. One winner. Endless rematches.';
+  aiThinking = false;
+
   private celebrationTimer?: ReturnType<typeof setTimeout>;
   private playAgainTimer?: ReturnType<typeof setTimeout>;
   private aiTimer?: ReturnType<typeof setTimeout>;
-
-  
-  
 
   private winningCombinations = [
     [0, 1, 2],
@@ -56,46 +54,44 @@ export class Board implements OnDestroy {
     [0, 4, 8],
     [2, 4, 6]
   ];
- 
-    constructor(
+
+  constructor(
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {}
 
-  // ### Sound management 
-    private sounds: any = {};
-    // Initialize audio objects only in the browser environment 
-    ngOnInit() {
-      if (isPlatformBrowser(this.platformId)) {
-        this.sounds = {
-          click: new Audio('assets/sounds/click.mp3'),
-          win: new Audio('assets/sounds/win.mp3'),
-          draw: new Audio('assets/sounds/draw.mp3')
-        };
+  private sounds: any = {};
+  isMuted = false;
 
-        // optional volume tuning
-        this.sounds.click.volume = 0.5;
-        this.sounds.win.volume = 1;
-        this.sounds.draw.volume = 0.7;
-      }
+  ngOnInit(): void {
+    if (isPlatformBrowser(this.platformId)) {
+      this.sounds = {
+        click: new Audio('assets/sounds/click.mp3'),
+        win: new Audio('assets/sounds/win.mp3'),
+        draw: new Audio('assets/sounds/draw.mp3')
+      };
+
+      this.sounds.click.volume = 0.5;
+      this.sounds.win.volume = 1;
+      this.sounds.draw.volume = 0.7;
     }
 
-    // Mute toggle
-    isMuted = false;
-    toggleSound() {
-      this.isMuted = !this.isMuted;
-    }
+    this.updateCurrentPlayerText();
+  }
 
-    private playSound(sound: 'click' | 'win' | 'draw') {
-      if (this.isMuted) return;
+  toggleSound(): void {
+    this.isMuted = !this.isMuted;
+  }
 
-      const audio = this.sounds[sound];
-      if (!audio) return;
+  private playSound(sound: 'click' | 'win' | 'draw'): void {
+    if (this.isMuted) return;
 
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
-    }
-  
+    const audio = this.sounds[sound];
+    if (!audio) return;
+
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }
 
   setMode(mode: GameMode): void {
     if (this.mode === mode) return;
@@ -103,22 +99,22 @@ export class Board implements OnDestroy {
     this.newGame();
   }
 
+
+
   makeMove(index: number): void {
     if (this.squares[index] || this.winner || this.draw) return;
 
-    // In single-player mode, block clicks while AI is thinking / playing
-    if (this.isAIMode && this.player === 'O') return;
+    if (this.isAIMode && (this.player === 'O' || this.aiThinking)) return;
 
-    // player move
     this.squares[index] = this.player;
-
-    // 🔊 click sound
     this.playSound('click');
 
     const line = this.getWinningLine();
     if (line) {
       this.winner = this.player;
       this.winningLine = line;
+      this.aiThinking = false;
+      this.updateCurrentPlayerText();
       this.startWinSequence();
       return;
     }
@@ -126,17 +122,28 @@ export class Board implements OnDestroy {
     if (this.squares.every(s => s !== null)) {
       this.draw = true;
       this.showPlayAgain = true;
+      this.aiThinking = false;
+      this.updateCurrentPlayerText();
+      this.playSound('draw');
       this.cdr.detectChanges();
       return;
     }
 
     this.player = this.player === 'X' ? 'O' : 'X';
 
-    // AI turn in single-player mode
     if (this.isAIMode && this.player === 'O') {
+      this.aiThinking = true;
+      this.updateCurrentPlayerText();
+      this.cdr.detectChanges();
+
       if (this.aiTimer) clearTimeout(this.aiTimer);
-      this.aiTimer = setTimeout(() => this.aiMove(), 400);
+      const delay = 1000 + Math.random() * 1000;
+      this.aiTimer = setTimeout(() => this.aiMove(), delay);
+      return;
     }
+
+    this.aiThinking = false;
+    this.updateCurrentPlayerText();
   }
 
   newGame(): void {
@@ -152,7 +159,9 @@ export class Board implements OnDestroy {
     this.celebrationActive = false;
     this.showPlayAgain = false;
     this.sparks = [];
+    this.aiThinking = false;
 
+    this.updateCurrentPlayerText();
     this.cdr.detectChanges();
   }
 
@@ -162,7 +171,6 @@ export class Board implements OnDestroy {
     this.createSparks();
     this.cdr.detectChanges();
 
-    // 🔊 win sound  (delayed)
     setTimeout(() => this.playSound('win'), 300);
 
     this.celebrationTimer = setTimeout(() => {
@@ -207,33 +215,35 @@ export class Board implements OnDestroy {
     }
     return null;
   }
- // AI logic: first try to win, then block player, then random move
+
   private aiMove(): void {
     const emptyIndexes = this.squares
       .map((v, i) => (v === null ? i : null))
       .filter(v => v !== null) as number[];
 
-    if (emptyIndexes.length === 0 || this.winner || this.draw || !this.isAIMode) return;
+    if (emptyIndexes.length === 0 || this.winner || this.draw || !this.isAIMode) {
+      this.aiThinking = false;
+      this.updateCurrentPlayerText();
+      this.cdr.detectChanges();
+      return;
+    }
 
-    // 1) try to win
     const winMove = this.findBestMove('O');
     if (winMove !== null) {
       this.playAIMove(winMove);
       return;
     }
 
-    // 2) block player
     const blockMove = this.findBestMove('X');
     if (blockMove !== null) {
       this.playAIMove(blockMove);
       return;
     }
 
-    // 3) random move
     const randomMove = emptyIndexes[Math.floor(Math.random() * emptyIndexes.length)];
     this.playAIMove(randomMove);
   }
- // Check if the given player can win in the next move, and return that move index
+
   private findBestMove(player: Player): number | null {
     for (let i = 0; i < this.squares.length; i++) {
       if (this.squares[i] !== null) continue;
@@ -247,19 +257,24 @@ export class Board implements OnDestroy {
 
     return null;
   }
-// Make the AI move and handle the game state updates
+
   private playAIMove(index: number): void {
-    if (this.squares[index] !== null || this.winner || this.draw) return;
+    if (this.squares[index] !== null || this.winner || this.draw) {
+      this.aiThinking = false;
+      this.updateCurrentPlayerText();
+      this.cdr.detectChanges();
+      return;
+    }
 
     this.squares[index] = 'O';
-
-    // 🔊 AI click
     this.playSound('click');
 
     const line = this.getWinningLine();
     if (line) {
       this.winner = 'O';
       this.winningLine = line;
+      this.aiThinking = false;
+      this.updateCurrentPlayerText();
       this.startWinSequence();
       return;
     }
@@ -267,11 +282,16 @@ export class Board implements OnDestroy {
     if (this.squares.every(s => s !== null)) {
       this.draw = true;
       this.showPlayAgain = true;
+      this.aiThinking = false;
+      this.updateCurrentPlayerText();
+      this.playSound('draw');
       this.cdr.detectChanges();
       return;
     }
 
     this.player = 'X';
+    this.aiThinking = false;
+    this.updateCurrentPlayerText();
     this.cdr.detectChanges();
   }
 
@@ -282,7 +302,24 @@ export class Board implements OnDestroy {
   }
 
 
-  
+  currentPlayerText = 'Your turn';
 
+updateCurrentPlayerText(): void {
+  if (this.winner) {
+    this.currentPlayerText = `Winner: ${this.winner}`;
+    return;
+  }
 
+  if (this.draw) {
+    this.currentPlayerText = 'Draw';
+    return;
+  }
+
+  if (this.isAIMode && this.aiThinking) {
+    this.currentPlayerText = 'AI is thinking... 🤖';
+    return;
+  }
+
+  this.currentPlayerText = 'Your turn';
+}
 }
