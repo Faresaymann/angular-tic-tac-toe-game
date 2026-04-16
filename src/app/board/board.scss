@@ -514,6 +514,70 @@
   letter-spacing: 0.2px;
 }
 
+/* NEW: player roster styles */
+.player-roster {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.player-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.player-card.active {
+  border-color: rgba(96, 165, 250, 0.7);
+  box-shadow:
+    0 0 0 1px rgba(96, 165, 250, 0.12) inset,
+    0 12px 28px rgba(15, 23, 42, 0.35),
+    0 0 18px rgba(56, 189, 248, 0.2);
+  transform: translateY(-1px);
+}
+
+.player-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.55rem;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(236, 72, 153, 0.18));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  flex: 0 0 auto;
+}
+
+.player-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.player-symbol {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.player-name {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #f8fafc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @keyframes bgShift {
   0% {
     background-position: 0% 0%, 100% 100%, 0% 50%;
@@ -740,5 +804,9 @@
 
   .room-input {
     max-width: 100%;
+  }
+
+  .player-roster {
+    grid-template-columns: 1fr;
   }
 }

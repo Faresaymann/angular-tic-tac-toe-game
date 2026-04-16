@@ -27,6 +27,10 @@ export interface RoomData {
   status: RoomStatus;
   xClientId: string | null;
   oClientId: string | null;
+  xName: string | null;
+  xAvatar: string | null;
+  oName: string | null;
+  oAvatar: string | null;
   winningLine: number[] | null;
 }
 
@@ -72,6 +76,16 @@ export class OnlineGameService {
     return Math.random().toString(36).slice(2, 8).toUpperCase();
   }
 
+  private normalizeName(name: any, fallback: string): string | null {
+    const value = typeof name === 'string' ? name.trim() : '';
+    return value || fallback;
+  }
+
+  private normalizeAvatar(avatar: any, fallback: string): string | null {
+    const value = typeof avatar === 'string' ? avatar.trim() : '';
+    return value || fallback;
+  }
+
   private normalizeRoom(roomId: string, data: any): RoomData {
     const squares: Cell[] = Array.isArray(data?.squares)
       ? data.squares.slice(0, 9).map((cell: any) => (cell === 'X' || cell === 'O' ? cell : null))
@@ -86,6 +100,10 @@ export class OnlineGameService {
       status: data?.status === 'playing' || data?.status === 'finished' ? data.status : 'waiting',
       xClientId: typeof data?.xClientId === 'string' ? data.xClientId : null,
       oClientId: typeof data?.oClientId === 'string' ? data.oClientId : null,
+      xName: this.normalizeName(data?.xName, 'Player X'),
+      xAvatar: this.normalizeAvatar(data?.xAvatar, '😀'),
+      oName: this.normalizeName(data?.oName, 'Player O'),
+      oAvatar: this.normalizeAvatar(data?.oAvatar, '😎'),
       winningLine: Array.isArray(data?.winningLine) ? data.winningLine : null
     };
   }
@@ -112,12 +130,15 @@ export class OnlineGameService {
     return null;
   }
 
-  async createRoom(): Promise<string> {
+  async createRoom(playerName = 'Player X', avatar = '😀'): Promise<string> {
     let roomId = this.generateRoomId();
 
     while (await getDoc(this.roomRef(roomId)).then(snap => snap.exists())) {
       roomId = this.generateRoomId();
     }
+
+    const cleanName = playerName.trim() || 'Player X';
+    const cleanAvatar = avatar.trim() || '😀';
 
     await setDoc(this.roomRef(roomId), {
       squares: Array(9).fill(null),
@@ -127,6 +148,10 @@ export class OnlineGameService {
       status: 'waiting',
       xClientId: this.clientId,
       oClientId: null,
+      xName: cleanName,
+      xAvatar: cleanAvatar,
+      oName: null,
+      oAvatar: null,
       winningLine: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
@@ -135,7 +160,7 @@ export class OnlineGameService {
     return roomId;
   }
 
-  async joinRoom(roomId: string): Promise<JoinResult> {
+  async joinRoom(roomId: string, playerName = 'Player O', avatar = '😎'): Promise<JoinResult> {
     roomId = roomId.trim().toUpperCase();
 
     const ref = this.roomRef(roomId);
@@ -147,6 +172,9 @@ export class OnlineGameService {
 
     const data = snap.data() as Partial<RoomData>;
 
+    const cleanName = playerName.trim() || 'Player O';
+    const cleanAvatar = avatar.trim() || '😎';
+
     let symbol: Player | null = null;
 
     if (data.xClientId === this.clientId) {
@@ -154,10 +182,30 @@ export class OnlineGameService {
     } else if (data.oClientId === this.clientId) {
       symbol = 'O';
     } else if (!data.xClientId) {
-      await setDoc(ref, { xClientId: this.clientId, status: 'waiting', updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(
+        ref,
+        {
+          xClientId: this.clientId,
+          xName: cleanName,
+          xAvatar: cleanAvatar,
+          status: 'waiting',
+          updatedAt: serverTimestamp()
+        },
+        { merge: true }
+      );
       symbol = 'X';
     } else if (!data.oClientId) {
-      await setDoc(ref, { oClientId: this.clientId, status: 'playing', updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(
+        ref,
+        {
+          oClientId: this.clientId,
+          oName: cleanName,
+          oAvatar: cleanAvatar,
+          status: 'playing',
+          updatedAt: serverTimestamp()
+        },
+        { merge: true }
+      );
       symbol = 'O';
     } else {
       throw new Error('Room is full.');

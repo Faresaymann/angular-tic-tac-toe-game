@@ -50,6 +50,11 @@ export class Board implements OnInit, OnDestroy {
   onlineError = '';
   onlineWinCelebrated = false;
   roomStatus: RoomStatus | 'idle' = 'idle';
+  roomData: RoomData | null = null;
+
+  playerName = 'Player';
+  selectedAvatar = '😀';
+  avatarOptions = ['😀', '😎', '🔥', '👻', '🤖', '🐱', '🐶', '⚡', '🎮', '🌟'];
 
   private celebrationTimer?: ReturnType<typeof setTimeout>;
   private playAgainTimer?: ReturnType<typeof setTimeout>;
@@ -125,7 +130,7 @@ export class Board implements OnInit, OnDestroy {
     this.resetLocalBoard();
 
     try {
-      const roomId = await this.onlineGame.createRoom();
+      const roomId = await this.onlineGame.createRoom(this.playerName, this.selectedAvatar);
       this.roomCode = roomId;
       this.roomInput = roomId;
       this.mySymbol = 'X';
@@ -156,7 +161,7 @@ export class Board implements OnInit, OnDestroy {
     this.resetLocalBoard();
 
     try {
-      const result = await this.onlineGame.joinRoom(code);
+      const result = await this.onlineGame.joinRoom(code, this.playerName, this.selectedAvatar);
 
       this.roomCode = code;
       this.roomInput = code;
@@ -291,6 +296,7 @@ export class Board implements OnInit, OnDestroy {
     this.aiThinking = false;
     this.onlineWinCelebrated = false;
     this.roomStatus = 'idle';
+    this.roomData = null;
     this.currentPlayerText = 'Your turn';
     this.winnerText = '';
     this.statusState = 'human';
@@ -304,6 +310,7 @@ export class Board implements OnInit, OnDestroy {
     this.mySymbol = null;
     this.onlineError = '';
     this.onlineWinCelebrated = false;
+    this.roomData = null;
   }
 
   private stopRoomListener(): void {
@@ -339,6 +346,7 @@ export class Board implements OnInit, OnDestroy {
   }
 
   private applyRoomState(room: RoomData): void {
+    this.roomData = room;
     this.squares = [...room.squares];
     this.player = room.turn;
     this.winner = room.winner;
@@ -347,6 +355,24 @@ export class Board implements OnInit, OnDestroy {
     this.roomStatus = room.status;
     this.showPlayAgain = room.status === 'finished';
     this.aiThinking = false;
+  }
+
+  getPlayerName(symbol: Player): string {
+    if (!this.roomData) {
+      return symbol === 'X' ? 'Player X' : 'Player O';
+    }
+
+    const raw = symbol === 'X' ? this.roomData.xName : this.roomData.oName;
+    return raw?.trim() || (symbol === 'X' ? 'Player X' : 'Player O');
+  }
+
+  getPlayerAvatar(symbol: Player): string {
+    if (!this.roomData) {
+      return symbol === 'X' ? '😀' : '😎';
+    }
+
+    const raw = symbol === 'X' ? this.roomData.xAvatar : this.roomData.oAvatar;
+    return raw?.trim() || (symbol === 'X' ? '😀' : '😎');
   }
 
   private updateTexts(): void {
@@ -359,10 +385,11 @@ export class Board implements OnInit, OnDestroy {
       }
 
       if (this.winner) {
+        const winnerName = this.getPlayerName(this.winner);
         this.winnerText =
           this.mySymbol && this.winner === this.mySymbol
             ? 'You won the game! 🎉'
-            : 'Opponent won the game! 🎉';
+            : `${winnerName} won the game! 🎉`;
 
         this.currentPlayerText = this.winnerText;
         this.statusState = 'waiting';
@@ -390,7 +417,11 @@ export class Board implements OnInit, OnDestroy {
         return;
       }
 
-      this.currentPlayerText = this.player === this.mySymbol ? 'Your turn' : "Opponent's turn";
+      const currentPlayerName = this.getPlayerName(this.player);
+
+      this.currentPlayerText =
+        this.player === this.mySymbol ? 'Your turn' : `${currentPlayerName}'s turn`;
+
       this.winnerText = '';
       this.statusState = this.player === this.mySymbol ? 'human' : 'waiting';
       return;
