@@ -34,29 +34,87 @@
     </button>
 
     <button (click)="setMode('two')" [class.active]="mode === 'two'">
-      Play vs Friend
+      Play Local
     </button>
 
-    <div class="slider" [class.right]="mode === 'two'"></div>
+    <button (click)="setMode('online')" [class.active]="mode === 'online'">
+      Online Room
+    </button>
+
+    <div class="slider" [class.right]="mode === 'two'" [class.extra-right]="mode === 'online'"></div>
   </div>
 
+  <section class="online-panel" *ngIf="mode === 'online'">
+    <div class="online-row">
+      <input
+        class="room-input"
+        type="text"
+        [(ngModel)]="roomInput"
+        placeholder="Room code"
+        maxlength="12"
+      />
+
+      <button class="room-btn secondary" (click)="joinOnlineRoom()">Join Room</button>
+      <button class="room-btn primary" (click)="createOnlineRoom()">Create Room</button>
+    </div>
+
+    <div class="online-row">
+      <input
+        class="room-input"
+        type="text"
+        [(ngModel)]="playerName"
+        placeholder="Your name"
+        maxlength="20"
+      />
+
+      <select class="room-input" [(ngModel)]="selectedAvatar">
+        <option *ngFor="let avatar of avatarOptions" [value]="avatar">
+          {{ avatar }}
+        </option>
+      </select>
+    </div>
+
+    <div class="online-meta" *ngIf="roomCode">
+      <span>Room: <strong>{{ roomCode }}</strong></span>
+      <button class="room-btn secondary" (click)="copyRoomLink()">Copy Link</button>
+    </div>
+
+    <div class="player-roster" *ngIf="roomData">
+      <div class="player-card" [class.active]="mySymbol === 'X'">
+        <div class="player-avatar">{{ getPlayerAvatar('X') }}</div>
+        <div class="player-info">
+          <div class="player-symbol">X</div>
+          <div class="player-name">{{ getPlayerName('X') }}</div>
+        </div>
+      </div>
+
+      <div class="player-card" [class.active]="mySymbol === 'O'">
+        <div class="player-avatar">{{ getPlayerAvatar('O') }}</div>
+        <div class="player-info">
+          <div class="player-symbol">O</div>
+          <div class="player-name">{{ getPlayerName('O') }}</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="room-error" *ngIf="onlineError">{{ onlineError }}</p>
+  </section>
+
   <section class="status-wrap">
-    <p class="status current-player" [class.ai-think]="aiThinking" [class.human-turn]="!aiThinking && !winner && !draw" *ngIf="!winner && !draw">
-    {{ currentPlayerText }}
+    <p
+      class="status current-player"
+      [class.ai-think]="statusState === 'thinking' || statusState === 'waiting'"
+      [class.human-turn]="statusState === 'human'"
+      *ngIf="!winner && !draw">
+      {{ currentPlayerText }}
     </p>
 
     <p class="status winner-text" *ngIf="winner">
-      <ng-container *ngIf="isAIMode && winner === 'O'; else humanWin">
-        AI won the game! 🤖🎉
-      </ng-container>
-
-      <ng-template #humanWin>
-        You won the game! 🎉
-      </ng-template>
+      {{ winnerText }}
     </p>
 
     <p class="status draw-text" *ngIf="draw">
-      It is a draw. Nobody wins this round.
+      {{ drawText }}
     </p>
   </section>
 

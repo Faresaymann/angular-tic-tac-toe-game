@@ -1,10 +1,11 @@
 import { Component, OnDestroy, OnInit, ChangeDetectorRef, Inject, PLATFORM_ID } from '@angular/core';
-import { isPlatformBrowser, CommonModule } from '@angular/common';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Square } from '../square/square';
+import { Cell, Player, RoomData, RoomStatus, OnlineGameService } from '../services/online-game.service';
 
-type Player = 'X' | 'O';
-type Cell = Player | null;
-type GameMode = 'single' | 'two';
+type GameMode = 'single' | 'two' | 'online';
 
 interface Spark {
   x: number;
@@ -17,7 +18,7 @@ interface Spark {
 @Component({
   selector: 'app-board',
   standalone: true,
-  imports: [CommonModule, Square],
+  imports: [CommonModule, FormsModule, Square],
   templateUrl: './board.html',
   styleUrl: './board.scss'
 })
@@ -33,35 +34,43 @@ export class Board implements OnInit, OnDestroy {
   sparks: Spark[] = [];
 
   mode: GameMode = 'single';
-  get isAIMode(): boolean {
-    return this.mode === 'single';
-  }
 
   subtitleText = 'Two players. One winner. Endless rematches.';
+  currentPlayerText = 'Your turn';
+  winnerText = '';
+  drawText = 'It is a draw. Nobody wins this round.';
+  statusState: 'human' | 'thinking' | 'waiting' = 'human';
+
   aiThinking = false;
+
+  roomInput = '';
+  roomCode = '';
+  roomLink = '';
+  mySymbol: Player | null = null;
+  onlineError = '';
+  onlineWinCelebrated = false;
+  roomStatus: RoomStatus | 'idle' = 'idle';
+  roomData: RoomData | null = null;
+
+  playerName = 'Player';
+  selectedAvatar = '😀';
+  avatarOptions = ['😀', '😎', '🔥', '👻', '🤖', '🐱', '🐶', '⚡', '🎮', '🌟'];
 
   private celebrationTimer?: ReturnType<typeof setTimeout>;
   private playAgainTimer?: ReturnType<typeof setTimeout>;
   private aiTimer?: ReturnType<typeof setTimeout>;
-
-  private winningCombinations = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8],
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8],
-    [0, 4, 8],
-    [2, 4, 6]
-  ];
-
-  constructor(
-    private cdr: ChangeDetectorRef,
-    @Inject(PLATFORM_ID) private platformId: Object
-  ) {}
+  private roomUnsub?: () => void;
 
   private sounds: any = {};
   isMuted = false;
+
+  constructor(
+    private cdr: ChangeDetectorRef,
+    @Inject(PLATFORM_ID) private platformId: Object,
+    private route: ActivatedRoute,
+    private router: Router,
+    private onlineGame: OnlineGameService
+  ) {}
 
   ngOnInit(): void {
     if (isPlatformBrowser(this.platformId)) {
@@ -76,7 +85,14 @@ export class Board implements OnInit, OnDestroy {
       this.sounds.draw.volume = 0.7;
     }
 
-    this.updateCurrentPlayerText();
+    this.updateTexts();
+
+    const room = this.route.snapshot.queryParamMap.get('room');
+    if (room) {
+      this.mode = 'online';
+      this.roomInput = room.toUpperCase();
+      void this.joinOnlineRoom(room.toUpperCase(), true);
+    }
   }
 
   toggleSound(): void {
@@ -95,26 +111,128 @@ export class Board implements OnInit, OnDestroy {
 
   setMode(mode: GameMode): void {
     if (this.mode === mode) return;
+
+    if (this.mode === 'online' && mode !== 'online') {
+      this.stopRoomListener();
+      this.clearOnlineSession();
+    }
+
     this.mode = mode;
-    this.newGame();
+    this.resetLocalBoard();
+    this.updateTexts();
+    this.cdr.detectChanges();
   }
 
+  async createOnlineRoom(): Promise<void> {
+    this.mode = 'online';
+    this.onlineError = '';
+    this.stopRoomListener();
+    this.resetLocalBoard();
 
+    try {
+      const roomId = await this.onlineGame.createRoom(this.playerName, this.selectedAvatar);
+      this.roomCode = roomId;
+      this.roomInput = roomId;
+      this.mySymbol = 'X';
+      this.roomStatus = 'waiting';
+      this.roomLink = this.makeRoomLink(roomId);
+      this.onlineWinCelebrated = false;
+
+      await this.router.navigate([], {
+        queryParams: { room: roomId },
+        queryParamsHandling: 'merge'
+      });
+
+      this.startRoomListener(roomId);
+      this.updateTexts();
+      this.cdr.detectChanges();
+    } catch (error) {
+      this.onlineError = error instanceof Error ? error.message : 'Could not create room.';
+    }
+  }
+
+  async joinOnlineRoom(roomId: string = this.roomInput, autoJoin = false): Promise<void> {
+    const code = roomId.trim().toUpperCase();
+    if (!code) return;
+
+    this.mode = 'online';
+    this.onlineError = '';
+    this.stopRoomListener();
+    this.resetLocalBoard();
+
+    try {
+      const result = await this.onlineGame.joinRoom(code, this.playerName, this.selectedAvatar);
+
+      this.roomCode = code;
+      this.roomInput = code;
+      this.mySymbol = result.symbol;
+      this.roomStatus = result.room.status;
+      this.roomLink = this.makeRoomLink(code);
+      this.onlineWinCelebrated = false;
+
+      await this.router.navigate([], {
+        queryParams: { room: code },
+        queryParamsHandling: 'merge'
+      });
+
+      this.applyRoomState(result.room);
+      this.startRoomListener(code);
+      this.updateTexts();
+      this.cdr.detectChanges();
+    } catch (error) {
+      this.onlineError = error instanceof Error ? error.message : 'Could not join room.';
+      if (!autoJoin) {
+        this.cdr.detectChanges();
+      }
+    }
+  }
+
+  copyRoomLink(): void {
+    if (!this.roomLink || !isPlatformBrowser(this.platformId)) return;
+
+    navigator.clipboard?.writeText(this.roomLink).catch(() => {});
+  }
+
+  private makeRoomLink(roomId: string): string {
+    if (!isPlatformBrowser(this.platformId)) return '';
+
+    const tree = this.router.createUrlTree([], {
+      relativeTo: this.route,
+      queryParams: { room: roomId }
+    });
+
+    return `${window.location.origin}${this.router.serializeUrl(tree)}`;
+  }
 
   makeMove(index: number): void {
+    if (this.mode === 'online') {
+      if (!this.roomCode || !this.mySymbol || this.draw || this.winner || this.roomStatus === 'waiting') return;
+      if (this.player !== this.mySymbol) return;
+
+      void this.onlineGame
+        .makeMove(this.roomCode, index, this.mySymbol)
+        .then(() => this.playSound('click'))
+        .catch(error => {
+          this.onlineError = error instanceof Error ? error.message : 'Move failed.';
+          this.cdr.detectChanges();
+        });
+
+      return;
+    }
+
     if (this.squares[index] || this.winner || this.draw) return;
 
-    if (this.isAIMode && (this.player === 'O' || this.aiThinking)) return;
+    if (this.mode === 'single' && (this.player === 'O' || this.aiThinking)) return;
 
     this.squares[index] = this.player;
     this.playSound('click');
 
-    const line = this.getWinningLine();
+    const line = this.getWinningLine(this.squares);
     if (line) {
       this.winner = this.player;
       this.winningLine = line;
       this.aiThinking = false;
-      this.updateCurrentPlayerText();
+      this.updateTexts();
       this.startWinSequence();
       return;
     }
@@ -123,7 +241,7 @@ export class Board implements OnInit, OnDestroy {
       this.draw = true;
       this.showPlayAgain = true;
       this.aiThinking = false;
-      this.updateCurrentPlayerText();
+      this.updateTexts();
       this.playSound('draw');
       this.cdr.detectChanges();
       return;
@@ -131,22 +249,38 @@ export class Board implements OnInit, OnDestroy {
 
     this.player = this.player === 'X' ? 'O' : 'X';
 
-    if (this.isAIMode && this.player === 'O') {
+    if (this.mode === 'single' && this.player === 'O') {
       this.aiThinking = true;
-      this.updateCurrentPlayerText();
+      this.updateTexts();
       this.cdr.detectChanges();
 
       if (this.aiTimer) clearTimeout(this.aiTimer);
       const delay = 1000 + Math.random() * 1000;
+
       this.aiTimer = setTimeout(() => this.aiMove(), delay);
       return;
     }
 
     this.aiThinking = false;
-    this.updateCurrentPlayerText();
+    this.updateTexts();
   }
 
   newGame(): void {
+    if (this.mode === 'online' && this.roomCode) {
+      void this.onlineGame.resetRoom(this.roomCode).catch(error => {
+        this.onlineError = error instanceof Error ? error.message : 'Could not reset room.';
+        this.cdr.detectChanges();
+      });
+      this.onlineWinCelebrated = false;
+      return;
+    }
+
+    this.resetLocalBoard();
+    this.updateTexts();
+    this.cdr.detectChanges();
+  }
+
+  private resetLocalBoard(): void {
     if (this.celebrationTimer) clearTimeout(this.celebrationTimer);
     if (this.playAgainTimer) clearTimeout(this.playAgainTimer);
     if (this.aiTimer) clearTimeout(this.aiTimer);
@@ -160,15 +294,177 @@ export class Board implements OnInit, OnDestroy {
     this.showPlayAgain = false;
     this.sparks = [];
     this.aiThinking = false;
+    this.onlineWinCelebrated = false;
+    this.roomStatus = 'idle';
+    this.roomData = null;
+    this.currentPlayerText = 'Your turn';
+    this.winnerText = '';
+    this.statusState = 'human';
+  }
 
-    this.updateCurrentPlayerText();
-    this.cdr.detectChanges();
+  private clearOnlineSession(): void {
+    this.roomCode = '';
+    this.roomInput = '';
+    this.roomLink = '';
+    this.roomStatus = 'idle';
+    this.mySymbol = null;
+    this.onlineError = '';
+    this.onlineWinCelebrated = false;
+    this.roomData = null;
+  }
+
+  private stopRoomListener(): void {
+    if (this.roomUnsub) {
+      this.roomUnsub();
+      this.roomUnsub = undefined;
+    }
+  }
+
+  private startRoomListener(roomId: string): void {
+    this.stopRoomListener();
+
+    this.roomUnsub = this.onlineGame.listenRoom(roomId, room => {
+      if (!room) {
+        this.onlineError = 'Room not found.';
+        this.updateTexts();
+        this.cdr.detectChanges();
+        return;
+      }
+
+      this.applyRoomState(room);
+
+      if (room.winner && !this.onlineWinCelebrated) {
+        this.onlineWinCelebrated = true;
+        this.updateTexts();
+        this.startWinSequence();
+      } else {
+        this.updateTexts();
+      }
+
+      this.cdr.detectChanges();
+    });
+  }
+
+  private applyRoomState(room: RoomData): void {
+    this.roomData = room;
+    this.squares = [...room.squares];
+    this.player = room.turn;
+    this.winner = room.winner;
+    this.draw = room.draw;
+    this.winningLine = room.winningLine ?? (room.winner ? this.getWinningLine(room.squares) : null);
+    this.roomStatus = room.status;
+    this.showPlayAgain = room.status === 'finished';
+    this.aiThinking = false;
+  }
+
+  getPlayerName(symbol: Player): string {
+    if (!this.roomData) {
+      return symbol === 'X' ? 'Player X' : 'Player O';
+    }
+
+    const raw = symbol === 'X' ? this.roomData.xName : this.roomData.oName;
+    return raw?.trim() || (symbol === 'X' ? 'Player X' : 'Player O');
+  }
+
+  getPlayerAvatar(symbol: Player): string {
+    if (!this.roomData) {
+      return symbol === 'X' ? '😀' : '😎';
+    }
+
+    const raw = symbol === 'X' ? this.roomData.xAvatar : this.roomData.oAvatar;
+    return raw?.trim() || (symbol === 'X' ? '😀' : '😎');
+  }
+
+  private updateTexts(): void {
+    if (this.mode === 'online') {
+      if (!this.roomCode) {
+        this.currentPlayerText = 'Create or join a room';
+        this.winnerText = '';
+        this.statusState = 'waiting';
+        return;
+      }
+
+      if (this.winner) {
+        const winnerName = this.getPlayerName(this.winner);
+        this.winnerText =
+          this.mySymbol && this.winner === this.mySymbol
+            ? 'You won the game! 🎉'
+            : `${winnerName} won the game! 🎉`;
+
+        this.currentPlayerText = this.winnerText;
+        this.statusState = 'waiting';
+        return;
+      }
+
+      if (this.draw) {
+        this.currentPlayerText = 'It is a draw 🤝';
+        this.winnerText = '';
+        this.statusState = 'waiting';
+        return;
+      }
+
+      if (this.roomStatus === 'waiting') {
+        this.currentPlayerText = 'Waiting for friend...';
+        this.winnerText = '';
+        this.statusState = 'waiting';
+        return;
+      }
+
+      if (!this.mySymbol) {
+        this.currentPlayerText = 'Joining room...';
+        this.winnerText = '';
+        this.statusState = 'waiting';
+        return;
+      }
+
+      const currentPlayerName = this.getPlayerName(this.player);
+
+      this.currentPlayerText =
+        this.player === this.mySymbol ? 'Your turn' : `${currentPlayerName}'s turn`;
+
+      this.winnerText = '';
+      this.statusState = this.player === this.mySymbol ? 'human' : 'waiting';
+      return;
+    }
+
+    if (this.winner) {
+      if (this.mode === 'single' && this.winner === 'O') {
+        this.winnerText = 'AI won the game! 🤖🎉';
+      } else if (this.mode === 'single' && this.winner === 'X') {
+        this.winnerText = 'You won the game! 🎉';
+      } else {
+        this.winnerText = `Player ${this.winner} won the game! 🎉`;
+      }
+
+      this.currentPlayerText = this.winnerText;
+      this.statusState = 'waiting';
+      return;
+    }
+
+    if (this.draw) {
+      this.currentPlayerText = 'It is a draw 🤝';
+      this.winnerText = '';
+      this.statusState = 'waiting';
+      return;
+    }
+
+    if (this.mode === 'single' && this.aiThinking) {
+      this.currentPlayerText = 'AI is thinking... 🤖';
+      this.winnerText = '';
+      this.statusState = 'thinking';
+      return;
+    }
+
+    this.currentPlayerText = 'Your turn';
+    this.winnerText = '';
+    this.statusState = 'human';
   }
 
   private startWinSequence(): void {
     this.celebrationActive = true;
     this.showPlayAgain = false;
     this.createSparks();
+
     this.cdr.detectChanges();
 
     setTimeout(() => this.playSound('win'), 300);
@@ -202,17 +498,25 @@ export class Board implements OnInit, OnDestroy {
     });
   }
 
-  private getWinningLine(): number[] | null {
-    for (const combo of this.winningCombinations) {
+  private getWinningLine(board: Cell[]): number[] | null {
+    const combos = [
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8],
+      [0, 3, 6],
+      [1, 4, 7],
+      [2, 5, 8],
+      [0, 4, 8],
+      [2, 4, 6]
+    ];
+
+    for (const combo of combos) {
       const [a, b, c] = combo;
-      if (
-        this.squares[a] &&
-        this.squares[a] === this.squares[b] &&
-        this.squares[a] === this.squares[c]
-      ) {
+      if (board[a] && board[a] === board[b] && board[a] === board[c]) {
         return combo;
       }
     }
+
     return null;
   }
 
@@ -221,9 +525,9 @@ export class Board implements OnInit, OnDestroy {
       .map((v, i) => (v === null ? i : null))
       .filter(v => v !== null) as number[];
 
-    if (emptyIndexes.length === 0 || this.winner || this.draw || !this.isAIMode) {
+    if (emptyIndexes.length === 0 || this.winner || this.draw || this.mode !== 'single') {
       this.aiThinking = false;
-      this.updateCurrentPlayerText();
+      this.updateTexts();
       this.cdr.detectChanges();
       return;
     }
@@ -249,7 +553,7 @@ export class Board implements OnInit, OnDestroy {
       if (this.squares[i] !== null) continue;
 
       this.squares[i] = player;
-      const win = this.getWinningLine();
+      const win = this.getWinningLine(this.squares);
       this.squares[i] = null;
 
       if (win) return i;
@@ -261,7 +565,7 @@ export class Board implements OnInit, OnDestroy {
   private playAIMove(index: number): void {
     if (this.squares[index] !== null || this.winner || this.draw) {
       this.aiThinking = false;
-      this.updateCurrentPlayerText();
+      this.updateTexts();
       this.cdr.detectChanges();
       return;
     }
@@ -269,12 +573,12 @@ export class Board implements OnInit, OnDestroy {
     this.squares[index] = 'O';
     this.playSound('click');
 
-    const line = this.getWinningLine();
+    const line = this.getWinningLine(this.squares);
     if (line) {
       this.winner = 'O';
       this.winningLine = line;
       this.aiThinking = false;
-      this.updateCurrentPlayerText();
+      this.updateTexts();
       this.startWinSequence();
       return;
     }
@@ -283,7 +587,7 @@ export class Board implements OnInit, OnDestroy {
       this.draw = true;
       this.showPlayAgain = true;
       this.aiThinking = false;
-      this.updateCurrentPlayerText();
+      this.updateTexts();
       this.playSound('draw');
       this.cdr.detectChanges();
       return;
@@ -291,7 +595,7 @@ export class Board implements OnInit, OnDestroy {
 
     this.player = 'X';
     this.aiThinking = false;
-    this.updateCurrentPlayerText();
+    this.updateTexts();
     this.cdr.detectChanges();
   }
 
@@ -299,27 +603,6 @@ export class Board implements OnInit, OnDestroy {
     if (this.celebrationTimer) clearTimeout(this.celebrationTimer);
     if (this.playAgainTimer) clearTimeout(this.playAgainTimer);
     if (this.aiTimer) clearTimeout(this.aiTimer);
+    this.stopRoomListener();
   }
-
-
-  currentPlayerText = 'Your turn';
-
-updateCurrentPlayerText(): void {
-  if (this.winner) {
-    this.currentPlayerText = `Winner: ${this.winner}`;
-    return;
-  }
-
-  if (this.draw) {
-    this.currentPlayerText = 'Draw';
-    return;
-  }
-
-  if (this.isAIMode && this.aiThinking) {
-    this.currentPlayerText = 'AI is thinking... 🤖';
-    return;
-  }
-
-  this.currentPlayerText = 'Your turn';
-}
 }
