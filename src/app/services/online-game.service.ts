@@ -13,6 +13,7 @@ import {
   serverTimestamp,
   setDoc
 } from 'firebase/firestore';
+import { AppAuthService } from './app-auth.service';
 
 export type Player = 'X' | 'O';
 export type Cell = Player | null;
@@ -25,12 +26,21 @@ export interface RoomData {
   winner: Player | null;
   draw: boolean;
   status: RoomStatus;
+
+  xUid: string | null;
+  oUid: string | null;
+
   xClientId: string | null;
   oClientId: string | null;
+
   xName: string | null;
-  xAvatar: string | null;
   oName: string | null;
+  xAvatar: string | null;
   oAvatar: string | null;
+
+  xStatsRecorded: boolean;
+  oStatsRecorded: boolean;
+
   winningLine: number[] | null;
 }
 
@@ -46,8 +56,9 @@ export class OnlineGameService {
   private app: FirebaseApp = getApps().length ? getApp() : initializeApp(environment.firebase);
   private db: Firestore = getFirestore(this.app);
   private clientId = this.getClientId();
-
   private roomsCol = collection(this.db, 'rooms');
+
+  constructor(private auth: AppAuthService) {}
 
   private roomRef(roomId: string) {
     return doc(this.roomsCol, roomId);
@@ -76,16 +87,6 @@ export class OnlineGameService {
     return Math.random().toString(36).slice(2, 8).toUpperCase();
   }
 
-  private normalizeName(name: any, fallback: string): string | null {
-    const value = typeof name === 'string' ? name.trim() : '';
-    return value || fallback;
-  }
-
-  private normalizeAvatar(avatar: any, fallback: string): string | null {
-    const value = typeof avatar === 'string' ? avatar.trim() : '';
-    return value || fallback;
-  }
-
   private normalizeRoom(roomId: string, data: any): RoomData {
     const squares: Cell[] = Array.isArray(data?.squares)
       ? data.squares.slice(0, 9).map((cell: any) => (cell === 'X' || cell === 'O' ? cell : null))
@@ -98,12 +99,21 @@ export class OnlineGameService {
       winner: data?.winner === 'X' || data?.winner === 'O' ? data.winner : null,
       draw: !!data?.draw,
       status: data?.status === 'playing' || data?.status === 'finished' ? data.status : 'waiting',
+
+      xUid: typeof data?.xUid === 'string' ? data.xUid : null,
+      oUid: typeof data?.oUid === 'string' ? data.oUid : null,
+
       xClientId: typeof data?.xClientId === 'string' ? data.xClientId : null,
       oClientId: typeof data?.oClientId === 'string' ? data.oClientId : null,
-      xName: this.normalizeName(data?.xName, 'Player X'),
-      xAvatar: this.normalizeAvatar(data?.xAvatar, '😀'),
-      oName: this.normalizeName(data?.oName, 'Player O'),
-      oAvatar: this.normalizeAvatar(data?.oAvatar, '😎'),
+
+      xName: typeof data?.xName === 'string' ? data.xName : null,
+      oName: typeof data?.oName === 'string' ? data.oName : null,
+      xAvatar: typeof data?.xAvatar === 'string' ? data.xAvatar : null,
+      oAvatar: typeof data?.oAvatar === 'string' ? data.oAvatar : null,
+
+      xStatsRecorded: !!data?.xStatsRecorded,
+      oStatsRecorded: !!data?.oStatsRecorded,
+
       winningLine: Array.isArray(data?.winningLine) ? data.winningLine : null
     };
   }
@@ -130,15 +140,19 @@ export class OnlineGameService {
     return null;
   }
 
-  async createRoom(playerName = 'Player X', avatar = '😀'): Promise<string> {
-    let roomId = this.generateRoomId();
+  async createRoom(playerName = 'Player', avatar = '😀'): Promise<string> {
+    const user = this.auth.currentUser;
+    if (!user) {
+      throw new Error('Please sign in first.');
+    }
 
+    let roomId = this.generateRoomId();
     while (await getDoc(this.roomRef(roomId)).then(snap => snap.exists())) {
       roomId = this.generateRoomId();
     }
 
-    const cleanName = playerName.trim() || 'Player X';
-    const cleanAvatar = avatar.trim() || '😀';
+    const cleanName = playerName.trim() || user.displayName?.trim() || 'Player';
+    const cleanAvatar = avatar.trim() || user.photoURL?.trim() || '😀';
 
     await setDoc(this.roomRef(roomId), {
       squares: Array(9).fill(null),
@@ -146,12 +160,21 @@ export class OnlineGameService {
       winner: null,
       draw: false,
       status: 'waiting',
+
+      xUid: user.uid,
+      oUid: null,
+
       xClientId: this.clientId,
       oClientId: null,
+
       xName: cleanName,
-      xAvatar: cleanAvatar,
       oName: null,
+      xAvatar: cleanAvatar,
       oAvatar: null,
+
+      xStatsRecorded: false,
+      oStatsRecorded: false,
+
       winningLine: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
@@ -160,7 +183,12 @@ export class OnlineGameService {
     return roomId;
   }
 
-  async joinRoom(roomId: string, playerName = 'Player O', avatar = '😎'): Promise<JoinResult> {
+  async joinRoom(roomId: string, playerName = 'Player', avatar = '😀'): Promise<JoinResult> {
+    const user = this.auth.currentUser;
+    if (!user) {
+      throw new Error('Please sign in first.');
+    }
+
     roomId = roomId.trim().toUpperCase();
 
     const ref = this.roomRef(roomId);
@@ -171,20 +199,20 @@ export class OnlineGameService {
     }
 
     const data = snap.data() as Partial<RoomData>;
-
-    const cleanName = playerName.trim() || 'Player O';
-    const cleanAvatar = avatar.trim() || '😎';
+    const cleanName = playerName.trim() || user.displayName?.trim() || 'Player';
+    const cleanAvatar = avatar.trim() || user.photoURL?.trim() || '😀';
 
     let symbol: Player | null = null;
 
-    if (data.xClientId === this.clientId) {
+    if (data.xUid === user.uid || data.xClientId === this.clientId) {
       symbol = 'X';
-    } else if (data.oClientId === this.clientId) {
+    } else if (data.oUid === user.uid || data.oClientId === this.clientId) {
       symbol = 'O';
-    } else if (!data.xClientId) {
+    } else if (!data.xUid) {
       await setDoc(
         ref,
         {
+          xUid: user.uid,
           xClientId: this.clientId,
           xName: cleanName,
           xAvatar: cleanAvatar,
@@ -194,10 +222,11 @@ export class OnlineGameService {
         { merge: true }
       );
       symbol = 'X';
-    } else if (!data.oClientId) {
+    } else if (!data.oUid) {
       await setDoc(
         ref,
         {
+          oUid: user.uid,
           oClientId: this.clientId,
           oName: cleanName,
           oAvatar: cleanAvatar,
@@ -291,8 +320,10 @@ export class OnlineGameService {
         turn: 'X',
         winner: null,
         draw: false,
-        status: room.oClientId ? 'playing' : 'waiting',
+        status: room.oUid ? 'playing' : 'waiting',
         winningLine: null,
+        xStatsRecorded: false,
+        oStatsRecorded: false,
         updatedAt: serverTimestamp()
       });
     });

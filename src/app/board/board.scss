@@ -48,6 +48,69 @@
   animation: gridMove 18s linear infinite;
 }
 
+.top-bar {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.user-menu {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.95);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.user-avatar.placeholder {
+  font-size: 1rem;
+}
+
+.dropdown {
+  min-width: 160px;
+  background: rgba(30, 41, 59, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(16px);
+}
+
+.dropdown button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 10px;
+}
+
+.dropdown button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .hero {
   text-align: center;
   z-index: 2;
@@ -514,7 +577,6 @@
   letter-spacing: 0.2px;
 }
 
-/* NEW: player roster styles */
 .player-roster {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -713,11 +775,6 @@
 @keyframes panelDrop {
   from { opacity: 0; transform: translateY(-16px) translateX(-50%) scale(0.96); }
   to { opacity: 1; transform: translateY(0) translateX(-50%) scale(1); }
-}
-
-@keyframes drift {
-  from { transform: translateY(0) scale(1); }
-  to { transform: translateY(-12px) scale(1.08); }
 }
 
 @keyframes sparkBurst {

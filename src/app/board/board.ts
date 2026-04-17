@@ -1,9 +1,27 @@
-import { Component, OnDestroy, OnInit, ChangeDetectorRef, Inject, PLATFORM_ID } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  ChangeDetectorRef,
+  Inject,
+  PLATFORM_ID
+} from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { User } from 'firebase/auth';
+import { Subscription } from 'rxjs';
+
 import { Square } from '../square/square';
-import { Cell, Player, RoomData, RoomStatus, OnlineGameService } from '../services/online-game.service';
+import {
+  Cell,
+  Player,
+  RoomData,
+  RoomStatus,
+  OnlineGameService
+} from '../services/online-game.service';
+import { AppAuthService } from '../services/app-auth.service';
+import { PlayerStatsService } from '../services/player-stats.service';
 
 type GameMode = 'single' | 'two' | 'online';
 
@@ -18,7 +36,7 @@ interface Spark {
 @Component({
   selector: 'app-board',
   standalone: true,
-  imports: [CommonModule, FormsModule, Square],
+  imports: [CommonModule, FormsModule, Square, RouterLink],
   templateUrl: './board.html',
   styleUrl: './board.scss'
 })
@@ -56,10 +74,15 @@ export class Board implements OnInit, OnDestroy {
   selectedAvatar = '😀';
   avatarOptions = ['😀', '😎', '🔥', '👻', '🤖', '🐱', '🐶', '⚡', '🎮', '🌟'];
 
+  currentUser: User | null = null;
+  authMenuOpen = false;
+
   private celebrationTimer?: ReturnType<typeof setTimeout>;
   private playAgainTimer?: ReturnType<typeof setTimeout>;
   private aiTimer?: ReturnType<typeof setTimeout>;
   private roomUnsub?: () => void;
+  private authSub?: Subscription;
+  private lastStatsKey = '';
 
   private sounds: any = {};
   isMuted = false;
@@ -69,10 +92,23 @@ export class Board implements OnInit, OnDestroy {
     @Inject(PLATFORM_ID) private platformId: Object,
     private route: ActivatedRoute,
     private router: Router,
-    private onlineGame: OnlineGameService
+    private onlineGame: OnlineGameService,
+    private auth: AppAuthService,
+    private statsService: PlayerStatsService
   ) {}
 
   ngOnInit(): void {
+    this.authSub = this.auth.user$.subscribe(user => {
+      this.currentUser = user;
+      this.authMenuOpen = false;
+
+      if (user && (!this.playerName || this.playerName === 'Player')) {
+        this.playerName = user.displayName?.trim() || 'Player';
+      }
+
+      this.cdr.detectChanges();
+    });
+
     if (isPlatformBrowser(this.platformId)) {
       this.sounds = {
         click: new Audio('assets/sounds/click.mp3'),
@@ -93,6 +129,10 @@ export class Board implements OnInit, OnDestroy {
       this.roomInput = room.toUpperCase();
       void this.joinOnlineRoom(room.toUpperCase(), true);
     }
+  }
+
+  toggleAuthMenu(): void {
+    this.authMenuOpen = !this.authMenuOpen;
   }
 
   toggleSound(): void {
@@ -123,20 +163,44 @@ export class Board implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
+  private getDisplayName(): string {
+    return this.playerName.trim() || this.currentUser?.displayName?.trim() || 'Player';
+  }
+
+  private getSelectedAvatar(): string {
+    return this.selectedAvatar.trim() || this.currentUser?.photoURL?.trim() || '😀';
+  }
+
+  async signIn(): Promise<void> {
+    await this.auth.signInWithGoogle();
+  }
+
+  async signOut(): Promise<void> {
+    this.authMenuOpen = false;
+    await this.auth.signOut();
+  }
+
   async createOnlineRoom(): Promise<void> {
+    if (!this.currentUser) {
+      this.onlineError = 'Please sign in from the top-right avatar first.';
+      this.cdr.detectChanges();
+      return;
+    }
+
     this.mode = 'online';
     this.onlineError = '';
     this.stopRoomListener();
     this.resetLocalBoard();
 
     try {
-      const roomId = await this.onlineGame.createRoom(this.playerName, this.selectedAvatar);
+      const roomId = await this.onlineGame.createRoom(this.getDisplayName(), this.getSelectedAvatar());
       this.roomCode = roomId;
       this.roomInput = roomId;
       this.mySymbol = 'X';
       this.roomStatus = 'waiting';
       this.roomLink = this.makeRoomLink(roomId);
       this.onlineWinCelebrated = false;
+      this.lastStatsKey = '';
 
       await this.router.navigate([], {
         queryParams: { room: roomId },
@@ -148,6 +212,7 @@ export class Board implements OnInit, OnDestroy {
       this.cdr.detectChanges();
     } catch (error) {
       this.onlineError = error instanceof Error ? error.message : 'Could not create room.';
+      this.cdr.detectChanges();
     }
   }
 
@@ -155,13 +220,19 @@ export class Board implements OnInit, OnDestroy {
     const code = roomId.trim().toUpperCase();
     if (!code) return;
 
+    if (!this.currentUser) {
+      this.onlineError = 'Please sign in from the top-right avatar first.';
+      if (!autoJoin) this.cdr.detectChanges();
+      return;
+    }
+
     this.mode = 'online';
     this.onlineError = '';
     this.stopRoomListener();
     this.resetLocalBoard();
 
     try {
-      const result = await this.onlineGame.joinRoom(code, this.playerName, this.selectedAvatar);
+      const result = await this.onlineGame.joinRoom(code, this.getDisplayName(), this.getSelectedAvatar());
 
       this.roomCode = code;
       this.roomInput = code;
@@ -189,7 +260,6 @@ export class Board implements OnInit, OnDestroy {
 
   copyRoomLink(): void {
     if (!this.roomLink || !isPlatformBrowser(this.platformId)) return;
-
     navigator.clipboard?.writeText(this.roomLink).catch(() => {});
   }
 
@@ -270,6 +340,7 @@ export class Board implements OnInit, OnDestroy {
       void this.onlineGame.resetRoom(this.roomCode).catch(error => {
         this.onlineError = error instanceof Error ? error.message : 'Could not reset room.';
         this.cdr.detectChanges();
+        this.lastStatsKey = '';
       });
       this.onlineWinCelebrated = false;
       return;
@@ -311,6 +382,7 @@ export class Board implements OnInit, OnDestroy {
     this.onlineError = '';
     this.onlineWinCelebrated = false;
     this.roomData = null;
+    this.lastStatsKey = '';
   }
 
   private stopRoomListener(): void {
@@ -320,31 +392,39 @@ export class Board implements OnInit, OnDestroy {
     }
   }
 
-  private startRoomListener(roomId: string): void {
-    this.stopRoomListener();
+private startRoomListener(roomId: string): void {
+  this.stopRoomListener();
 
-    this.roomUnsub = this.onlineGame.listenRoom(roomId, room => {
-      if (!room) {
-        this.onlineError = 'Room not found.';
-        this.updateTexts();
-        this.cdr.detectChanges();
-        return;
-      }
-
-      this.applyRoomState(room);
-
-      if (room.winner && !this.onlineWinCelebrated) {
-        this.onlineWinCelebrated = true;
-        this.updateTexts();
-        this.startWinSequence();
-      } else {
-        this.updateTexts();
-      }
-
+  this.roomUnsub = this.onlineGame.listenRoom(roomId, room => {
+    if (!room) {
+      this.onlineError = 'Room not found.';
+      this.updateTexts();
       this.cdr.detectChanges();
-    });
-  }
+      return;
+    }
 
+    this.applyRoomState(room);
+
+    if (room.status === 'finished' && this.currentUser && this.mySymbol) {
+      const statsKey = `${roomId}|${room.winner ?? 'none'}|${room.draw ? 'draw' : 'nodraw'}|${room.squares.join('')}`;
+
+      if (this.lastStatsKey !== statsKey) {
+        this.lastStatsKey = statsKey;
+        void this.statsService.recordFinalResult(roomId, this.mySymbol);
+      }
+    }
+
+    if (room.winner && !this.onlineWinCelebrated) {
+      this.onlineWinCelebrated = true;
+      this.updateTexts();
+      this.startWinSequence();
+    } else {
+      this.updateTexts();
+    }
+
+    this.cdr.detectChanges();
+  });
+}
   private applyRoomState(room: RoomData): void {
     this.roomData = room;
     this.squares = [...room.squares];
@@ -603,6 +683,7 @@ export class Board implements OnInit, OnDestroy {
     if (this.celebrationTimer) clearTimeout(this.celebrationTimer);
     if (this.playAgainTimer) clearTimeout(this.playAgainTimer);
     if (this.aiTimer) clearTimeout(this.aiTimer);
+    if (this.authSub) this.authSub.unsubscribe();
     this.stopRoomListener();
   }
 }

@@ -1,0 +1,84 @@
+<div class="page-shell">
+  <div class="topbar">
+    <button class="ghost-btn" type="button" (click)="backToGame()">Back to Game</button>
+
+    <div class="user-chip" *ngIf="user; else authButtons">
+      <img
+        *ngIf="user.photoURL; else chipFallback"
+        [src]="user.photoURL"
+        class="user-chip-avatar"
+        alt="User avatar"
+      />
+
+      <ng-template #chipFallback>
+        <div class="user-chip-avatar placeholder">
+          {{ (user.displayName || 'P').charAt(0) }}
+        </div>
+      </ng-template>
+
+      <div class="user-chip-text">
+        <span class="chip-label">Signed in as</span>
+        <strong>{{ user.displayName || 'Player' }}</strong>
+      </div>
+
+      <button class="ghost-btn danger" type="button" (click)="signOut()">Logout</button>
+    </div>
+
+    <ng-template #authButtons>
+      <div class="actions">
+        <button class="primary-btn" type="button" (click)="signIn()">Login with Google</button>
+      </div>
+    </ng-template>
+  </div>
+
+  <div class="dashboard-card">
+    <div class="dashboard-head">
+      <div>
+        <div class="kicker">Stats</div>
+        <h1 class="title">Dashboard</h1>
+      </div>
+    </div>
+
+    <div *ngIf="!user" class="empty-state">
+      <p>You are not logged in. Sign in to see your stats.</p>
+    </div>
+
+    <div *ngIf="user && loading" class="stats-grid">
+      <div class="stat-card skeleton" *ngFor="let item of [1, 2, 3, 4, 5]" [class.wide]="item === 5">
+        <span class="stat-label skeleton-box"></span>
+        <span class="stat-value skeleton-box"></span>
+      </div>
+    </div>
+
+    <div *ngIf="user && !loading">
+      <p class="muted">Your game performance summary.</p>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Games</span>
+          <span class="stat-value">{{ stats.gamesPlayed }}</span>
+        </div>
+
+        <div class="stat-card">
+          <span class="stat-label">Wins</span>
+          <span class="stat-value">{{ stats.wins }}</span>
+        </div>
+
+        <div class="stat-card">
+          <span class="stat-label">Losses</span>
+          <span class="stat-value">{{ stats.losses }}</span>
+        </div>
+
+        <div class="stat-card">
+          <span class="stat-label">Draws</span>
+          <span class="stat-value">{{ stats.draws }}</span>
+        </div>
+
+        <div class="stat-card wide">
+          <span class="stat-label">Win Rate</span>
+          <span class="stat-value">{{ winRate }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
