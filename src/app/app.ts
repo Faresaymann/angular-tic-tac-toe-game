@@ -1,13 +1,10 @@
-import { Component, signal } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { Board } from './board/board';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, Board],
-  templateUrl: './app.html',
-  styleUrl: './app.scss'
+  standalone: true,
+  imports: [RouterOutlet],
+  templateUrl: './app.html'
 })
-export class App {
-  protected readonly title = signal('tic-tac-toe');
-}
+export class App {}

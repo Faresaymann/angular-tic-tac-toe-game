@@ -1,0 +1,60 @@
+<div class="page-shell">
+  <div class="topbar">
+    <button class="ghost-btn" type="button" (click)="backToGame()">Back to Game</button>
+
+    <div class="actions" *ngIf="auth.user$ | async as user; else authButtons">
+      <button class="ghost-btn danger" (click)="signOut()">Logout</button>
+    </div>
+
+    <ng-template #authButtons>
+      <div class="actions">
+        <button class="primary-btn" (click)="signIn()">Login with Google</button>
+      </div>
+    </ng-template>
+  </div>
+
+  <div class="account-card">
+    <div class="account-head">
+      <div>
+        <div class="kicker">Account</div>
+        <h1 class="title">Profile</h1>
+      </div>
+
+      <div class="avatar-wrap" *ngIf="auth.user$ | async as user; else guestAvatar">
+        <img
+          *ngIf="user.photoURL; else avatarFallback"
+          [src]="user.photoURL"
+          class="avatar"
+          alt="User avatar"
+        />
+        <ng-template #avatarFallback>
+          <div class="avatar placeholder">{{ (user.displayName || 'P').charAt(0) }}</div>
+        </ng-template>
+      </div>
+
+      <ng-template #guestAvatar>
+        <div class="avatar placeholder">P</div>
+      </ng-template>
+    </div>
+
+    <div *ngIf="auth.user$ | async as user; else loggedOut" class="profile-grid">
+      <div class="profile-card">
+        <span class="label">Name</span>
+        <strong>{{ user.displayName || 'Player' }}</strong>
+      </div>
+
+      <div class="profile-card">
+        <span class="label">Email</span>
+        <strong>{{ user.email || 'No email available' }}</strong>
+      </div>
+
+    </div>
+
+    <ng-template #loggedOut>
+      <div class="empty-state">
+        <p>You are not logged in.</p>
+        <button class="primary-btn" (click)="signIn()">Login with Google</button>
+      </div>
+    </ng-template>
+  </div>
+</div>
