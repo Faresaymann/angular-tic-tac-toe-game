@@ -153,13 +153,11 @@ dist/tic-tac-toe
 ## ⭐ Future Improvements
 
 - Difficulty levels for AI
-- Online multiplayer
-- Score tracking system
 - Custom themes
 
 ---
 
 ## 👨‍💻 Author
 
-Your Name  
+Fares Ayman
 GitHub: https://github.com/Faresaymann
