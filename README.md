@@ -12,15 +12,23 @@ A modern Tic Tac Toe game built with Angular, featuring AI gameplay, smooth anim
 
 ## 🧩 Features
 
-- 🤖 Play against a smart AI or a friend
-- 🔄 Instant switching between game modes
-- 🧠 AI can win, block, or make random moves
-- 🔊 Sound effects (click, win, draw)
-- ✨ Animated UI with glowing effects
-- 🌌 Dynamic background visuals
-- 🎉 Victory celebration animations
-- 📱 Fully responsive (mobile & desktop)
-- 📦 Installable PWA (works offline)
+- 🤖 **Play against a smart AI or a friend**
+- 🔄 **Instant switching between game modes**
+- 🧠 **AI can win, block, or make random moves**
+- 🔊 **Sound effects (click, win, draw)**
+- ✨ **Animated UI with glowing effects**
+- 🌌 **Dynamic background visuals**
+- 🎉 **Victory celebration animations**
+- 📱 **Fully responsive (mobile & desktop)**
+- 📦 **Installable PWA (works offline)**
+- 🔑 **Google Authentication**
+- ☁️ **Firestore Database**  
+- 🎮 **Real-time Online Multiplayer**  
+- 📊 **Player Statistics Tracking**
+- 🔑 **Google Authentication**  
+- ☁️ **Firestore Database**  
+- 🎮 **Real-time Online Multiplayer**  
+- 📊 **Player Statistics Tracking**  
 
 ---
 
@@ -32,6 +40,7 @@ A modern Tic Tac Toe game built with Angular, featuring AI gameplay, smooth anim
 - HTML
 - Angular PWA
 - Vercel
+- FireBase
 
 ---
 
@@ -70,18 +79,21 @@ ng build --configuration production
 ```bash
 src/
   app/
-    board/        # game board logic & UI
-    square/       # individual cell component
-    app.component.ts
-    app.module.ts
+    board/            # game board logic, UI, and online gameplay
+    dashboard/        # player stats and win/loss history
+    account/          # user profile and auth page
+    services/         # Firebase auth, Firestore, and game services
+    square/           # individual cell component
+    app.component.ts   # root app shell
+    app.routes.ts      # route definitions
   assets/
-    sounds/       # click, win, draw effects
-    icons/        # PWA icons
-  environments/   # environment configs
+    sounds/            # click, win, draw effects
+    icons/             # PWA icons
+  environments/        # environment configs
   index.html
-  main.ts         # app bootstrap
-```
+  main.ts              # app bootstrap
 ---
+```
 
 ## 🔊 Sound Files
 
@@ -132,6 +144,28 @@ dist/tic-tac-toe
 ```
 
 ---
+## 🔥 Firebase Setup
+
+This project uses **Firebase** for authentication, database, and real-time gameplay.
+
+### 📦 Configuration
+
+Firebase is configured in the Angular environment files:
+
+```ts
+export const environment = {
+  production: false,
+  firebase: {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  }
+};
+```
+---
 
 ## 📝 Notes
 
@@ -160,4 +194,5 @@ dist/tic-tac-toe
 ## 👨‍💻 Author
 
 Fares Ayman
+
 GitHub: https://github.com/Faresaymann
